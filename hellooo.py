@@ -4,6 +4,31 @@ from sklearn.cluster import DBSCAN
 EARTH_R = 6_371_000 #meters
 n_points= coordinates.shape[0]
 
+coordinates = []
+
+
+
+
+#Remove duplicates and near-identical points
+
+def remove_duplicate_coordinates(coordinates):
+    """
+    Removes duplicate [lat, lon] pairs from a NumPy array.
+    
+    Parameters:
+        coords (np.ndarray): Array of shape (n, 2) with [lat, lon] pairs.
+        
+    Returns:
+        np.ndarray: New array with duplicates removed.
+    """
+    if not isinstance(coordinates, np.ndarray):
+        coordinates = np.array(coordinates)
+        
+    # Use np.unique along axis=0 to remove duplicate rows
+    unique_coords = np.unique(coordinates, axis=0)
+    return unique_coords
+
+
 
 #determine min samples
 def choose_min_samples(n_points: int) -> int:
@@ -103,3 +128,9 @@ def run_dbscan(points_deg, eps, min_samples):
     centroid_deg = np.degrees(centroid_rad).tolist()
 
     return centroid_deg, members.tolist(), labels.tolist()
+
+
+
+
+
+
