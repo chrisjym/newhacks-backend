@@ -1,11 +1,5 @@
-from hellooo.py import
+from hellooo import *
 import numpy as np
-from cluster import (
-    choose_min_samples,
-    kth_nearest_distance,
-    estimate_eps_from_elbow,
-    run_dbscan
-)
 
 if __name__ == "__main__":
     # Example input (replace with real data)
