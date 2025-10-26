@@ -10,7 +10,7 @@ from backend import (
 )
 
 # config
-client = genai.Client(api_key="AIzaSyD812vh66sjZF2TjI-OQeZKLNmu98oLHbc")
+client = genai.Client(api_key="API")
 
 
 app = FastAPI()
