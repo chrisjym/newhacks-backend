@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     eps = estimate_eps_from_elbow(k_distances)
 
-    centroid, members, labels = run_dbscan(points_lonlat, eps, min_samples)
+    centroid, members, labels, radius = run_dbscan(points_lonlat, eps, min_samples)
 
     print("\nmin_samples:", min_samples)
     print("k-distances:", k_distances)
@@ -32,3 +32,5 @@ if __name__ == "__main__":
     print("labels:", labels)
     print("members:", members)
     print("centroid (lat, lon):", centroid)
+    print("radius:", radius)
+ 
