@@ -1,4 +1,4 @@
-from hellooo import *
+from backend import *
 import numpy as np
 import google.generativeai as genai
 
