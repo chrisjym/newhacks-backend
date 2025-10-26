@@ -23,7 +23,7 @@ app.add_middleware(
 )
 
 # config
-client = genai.Client(api_key="AIzaSyD812vh66sjZF2TjI-OQeZKLNmu98oLHbc")
+client = genai.Client(api_key="API_KEY")
 
 
 
