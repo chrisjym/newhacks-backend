@@ -1,117 +1,106 @@
 import math
 import numpy as np
 from sklearn.cluster import DBSCAN
-EARTH_R = 6_371_000 #meters
-n_points= coordinates.shape[0]
 
-coordinates = []
+EARTH_R = 6_371_000  # meters
 
 
-
-
-#Remove duplicates and near-identical points
-
-def remove_duplicate_coordinates(coordinates):
-    """
-    Removes duplicate [lat, lon] pairs from a NumPy array.
-    
-    Parameters:
-        coords (np.ndarray): Array of shape (n, 2) with [lat, lon] pairs.
-        
-    Returns:
-        np.ndarray: New array with duplicates removed.
-    """
-    if not isinstance(coordinates, np.ndarray):
-        coordinates = np.array(coordinates)
-        
-    # Use np.unique along axis=0 to remove duplicate rows
-    unique_coords = np.unique(coordinates, axis=0)
-    return unique_coords
-
-
-
-#determine min samples
 def choose_min_samples(n_points: int) -> int:
     if n_points <= 8:
         return 3
     elif n_points <= 20:
         return 4
-    elif n_points <=50:
+    elif n_points <= 50:
         return 5
-    else: 
+    else:
         return 6
-    
-#compute distance to each points k-th nearest neighbor (k = min_samples)
-def haversine(lat1, lon1, lat2, lon2):
-    R = EARTH_R
-    lat1 = math.radians(lat1)
-    lon1 = math.radians(lon1)
-    lat2 = math.radians(lat2)
-    lon2 = math.radians(lon2)
 
+
+def haversine(lat1, lon1, lat2, lon2):
+    """Great-circle distance in meters between two points (degrees)."""
+    lat1 = math.radians(lat1); lon1 = math.radians(lon1)
+    lat2 = math.radians(lat2); lon2 = math.radians(lon2)
     dlat = lat2 - lat1
     dlon = lon2 - lon1
-    a = math.sin(dlat/2)**2 + math.cos(lat1)*math.cos(lat2)*(math.sin(dlon/2)**2)
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    a = math.sin(dlat/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin(dlon/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return EARTH_R * c
 
-    return R * c
 
-def kth_nearest_distance(points, k):
+def kth_nearest_distance(points_lonlat, k):
+    """
+    points_lonlat: (n,2) array-like with columns [lon, lat]
+    Returns list of k-th NN distances (meters) per point.
+    """
+    pts = np.asarray(points_lonlat, dtype=float)
+    n_points = pts.shape[0]
+    if n_points == 0 or k < 1:
+        return []
+    if n_points < 2:
+        return [0.0] * n_points
+    if k >= n_points:
+        k = n_points - 1
+
+    # swap to [lat, lon] for distance math
+    latlon = pts[:, [1, 0]]
+
     distances = []
-
     for i in range(n_points):
-        lat1, lon1 = points[i]
-        current_distances = []
-
+        lat1, lon1 = latlon[i]
+        dlist = []
         for j in range(n_points):
             if i == j:
                 continue
-            lat2, lon2 = points[j]
-            d = haversine(lat1, lon1, lat2, lon2)
-            current_distances.append(d)
-
-        current_distances.sort()
-        distances.append(current_distances[k-1])
-
+            lat2, lon2 = latlon[j]
+            dlist.append(haversine(lat1, lon1, lat2, lon2))
+        dlist.sort()
+        distances.append(dlist[k - 1])
     return distances
 
 
-#Sort all k-distance values
-k_distances = kth_nearest_distances(points,k)
-k_distances.sort()
-
-#Identify elbow point in sorted curve → estimate eps_m
-def estimate_eps_m_from_elbow(k_distances_sorted):
+def estimate_eps_from_elbow(k_distances_sorted):
+    """
+    Input: sorted-ascending list of k-NN distances (meters).
+    Output: eps in radians (meters / EARTH_R).
+    """
     n = len(k_distances_sorted)
+    if n == 0:
+        return None
+    if n < 3:
+        return k_distances_sorted[-1] / EARTH_R
+
     x0, y0 = 0, k_distances_sorted[0]
-    x1, y1 = n-1, k_distances_sorted[n-1]
+    x1, y1 = n - 1, k_distances_sorted[-1]
     dx, dy = x1 - x0, y1 - y0
-    denom = (dx**2 + dy**2) ** 0.5
-   
-    max_dist = -1
-    max_idx = 0
+    denom = (dx*dx + dy*dy) ** 0.5
+    if denom == 0:
+        return k_distances_sorted[-1] / EARTH_R
+
+    max_dist, max_idx = -1.0, 0
     for i, y in enumerate(k_distances_sorted):
-        num = abs(dy * i - dx * y + x1*y0 - y1*x0)
+        num = abs(dy*i - dx*y + x1*y0 - y1*x0)
         d = num / denom
         if d > max_dist:
-            max_dist = d
-            max_idx = i
+            max_dist, max_idx = d, i
+    return k_distances_sorted[max_idx] / EARTH_R  # radians
 
-    return k_distances_sorted[max_idx] / 6371000
-    
-#Run DBSCAN
-def run_dbscan(points_deg, eps, min_samples):
+
+def run_dbscan(points_lonlat, eps, min_samples):
     """
-    points_deg: list of (lat, lon) in degrees
-    eps: radians
-    min_samples: int
+    points_lonlat: (n,2) array-like with [lon, lat]
+    eps: radians (float) or None
     returns: (centroid_deg [lat, lon] or None, member_indices, labels_list)
     """
-    pts = np.array(points_deg, dtype=float)
-    if len(pts) < min_samples:
+    if eps is None:
         return None, [], []
 
-    pts_rad = np.radians(pts)  # (lat, lon) → radians
+    pts = np.asarray(points_lonlat, dtype=float)
+    if pts.shape[0] < min_samples:
+        return None, [], []
+
+    # swap to [lat, lon] then radians for haversine metric
+    pts_latlon = pts[:, [1, 0]]
+    pts_rad = np.radians(pts_latlon)
 
     db = DBSCAN(eps=eps, min_samples=min_samples, metric='haversine')
     labels = db.fit_predict(pts_rad)
@@ -124,13 +113,6 @@ def run_dbscan(points_deg, eps, min_samples):
     best_label = vals[np.argmax(counts)]
     members = np.where(labels == best_label)[0]
 
-    centroid_rad = pts_rad[members].mean(axis=0)
-    centroid_deg = np.degrees(centroid_rad).tolist()
-
-    return centroid_deg, members.tolist(), labels.tolist()
-
-
-
-
-
-
+    centroid_rad = pts_rad[members].mean(axis=0)          # [lat, lon] in rad
+    centroid_deg = np.degrees(centroid_rad).tolist()      # [lat, lon] in deg
+    return centroid_deg, members.tolist(), labels.tolist(), 2 * eps * EARTH_R
