@@ -4,7 +4,6 @@ from pydantic import BaseModel
 app = FastAPI()
 
 class MarkerRequest(BaseModel):
-    city: str
     coordinates: list
 
 @app.post('/api/activities/nearby')
