@@ -1,5 +1,6 @@
 from hellooo import *
 import numpy as np
+import google.generativeai as genai
 
 if __name__ == "__main__":
     # Example input (replace with real data)
@@ -33,4 +34,28 @@ if __name__ == "__main__":
     print("members:", members)
     print("centroid (lat, lon):", centroid)
     print("radius:", radius)
+
+genai.configure(api_key="APIKEY")  # or from env var
+
+model = genai.GenerativeModel("gemini-2.5-flash")  # any Gemini model you use
+
+# Your clustering outputs
+centroid = [35.6595, 139.7008]  # [lat, lon]
+members = [0,1,2]
+labels  = [0,0,0,1,1,1,-1]
+radius_m = 420.3
+
+prompt = f"""
+You are a Tokyo trip assistant.
+Cluster center (lat, lon): {centroid}
+Cluster radius (m): {radius_m:.1f}
+Cluster members (indices): {members}
+All labels: {labels}
+
+Task: Suggest 8 activities within ~{int(radius_m)} m of the center, grouped by food / sights / cafes.
+Return concise bullet points with names and why they fit.
+"""
+
+resp = model.generate_content(prompt)
+print(resp.text)
  
